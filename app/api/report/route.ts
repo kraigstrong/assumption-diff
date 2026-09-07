@@ -3,7 +3,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getClient, MODELS } from "@/lib/anthropic";
 import { clientIp, hasValidSession, rateLimit } from "@/lib/auth";
-import { BASELINE_ANSWERS, BASELINE_ROLE } from "@/lib/baseline";
+import { BASELINE_ANSWERS } from "@/lib/baseline";
 import { buildDiff, flaggedDiffs } from "@/lib/diff";
 import { DIMENSIONS } from "@/lib/questions";
 import { PRD } from "@/lib/prd";
@@ -83,10 +83,11 @@ export async function POST(request: Request) {
     [
       `--- DIMENSION: ${diff.dimension.id} (${diff.dimension.title})`,
       `Gap: ${diff.distance} of 3 steps on the axis "${diff.dimension.spectrum.low} -> ${diff.dimension.spectrum.high}".`,
-      `${BASELINE_ROLE} chose "${diff.baseline.option.label}" because: ${diff.baseline.rationale}`,
-      `Engineer chose "${diff.reviewer.option.label}"${
-        diff.reviewer.rationale ? ` because: ${diff.reviewer.rationale}` : ""
+      `Option A -- "${diff.baseline.option.label}". Argued for because: ${diff.baseline.rationale}`,
+      `Option B -- "${diff.reviewer.option.label}"${
+        diff.reviewer.rationale ? `. Argued for because: ${diff.reviewer.rationale}` : ""
       }`,
+      "`ifBaseline` is the cost of Option A. `ifReviewer` is the cost of Option B.",
       diff.followUp?.answer
         ? `Probed "${diff.followUp.question}" -- the engineer answered "${diff.followUp.answer}".`
         : "",
@@ -102,12 +103,12 @@ export async function POST(request: Request) {
         max_tokens: 4000,
         thinking: { type: "adaptive" },
         system:
-          "Two people answered the same questions about a product spec and disagreed. " +
+          "Two people answered the same questions about a product spec and chose different options. " +
           "For EACH dimension given, write the concrete decision someone must make before engineering starts.\n\n" +
           "Rules:\n" +
           "- `question`: the decision as one specific question a team could put on an agenda and settle in a single meeting. Not a restatement of the disagreement.\n" +
           "- `stakes`: what specifically breaks or gets rebuilt if this stays unresolved. One sentence, concrete.\n" +
-          "- `ifBaseline` / `ifReviewer`: the real cost of committing to each side's position. One sentence each. Name a tradeoff, not a benefit.\n" +
+          "- `ifBaseline` / `ifReviewer`: the real cost of committing to that OPTION. Write about the option and its consequences for the product, never about the person who picked it or about anyone winning. One sentence each. Name a tradeoff, not a benefit.\n" +
           "- Be specific to THIS spec. No generic advice.\n" +
           "- Under 30 words per field. Plain language, no jargon, no hedging.\n" +
           "- Return exactly one entry per dimension given, copying the dimensionId verbatim.",

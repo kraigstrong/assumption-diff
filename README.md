@@ -26,8 +26,13 @@ The interview asks about four dimensions where that ambiguity hides:
 | **Legal Retention** | Deletion wins → retention wins |
 
 Each has four answer options placed on that axis with a weight of 0–3.
-Disagreement is `|weightA − weightB|`: 0 is aligned, 1 is a gap worth
-confirming, 2+ means the two people are building different products.
+Disagreement is `|weightA − weightB|`: 0 is aligned, 1 is a minor gap, 2+ means
+the two people are building different products.
+
+Every non-zero gap gets a decision block. A one-step gap is a smaller
+disagreement, not a skippable one — so the report's headline counts exactly the
+set of dimensions that get one. The distance still drives severity, which is
+what colours the block, but it never decides whether something needs settling.
 
 **The product lead's answers are pre-recorded** (`lib/baseline.ts`), so the demo
 is single-player and reproducible: you play the engineer and diff against a

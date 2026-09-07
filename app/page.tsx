@@ -6,23 +6,24 @@ export default function LandingPage() {
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
         Assumption Diff
       </p>
-      <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-        Everyone agreed on the spec.
+      <h1 className="mt-4 text-[2rem] font-bold leading-[1.12] tracking-tight sm:text-[2.6rem]">
+        Implementation is getting faster.
         <br />
-        They just meant different things.
+        Clarity matters more than ever.
       </h1>
-      <p className="mt-5 max-w-xl text-base leading-relaxed text-muted">
-        A PRD reads as settled, then engineering builds one thing and product
-        expected another. The disagreement was there on day one — nobody asked a
-        question sharp enough to expose it.
+      <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
+        It’s easy for engineering and product to read the same spec, agree on
+        it, and walk away with completely different ideas about what they’re
+        building. And now it’s easier than ever to move quickly in the wrong
+        direction.
       </p>
       <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
-        This interviews both people separately with the same forced-choice
-        questions, scores how far apart their answers sit, and names the
-        decisions someone has to make before work starts.
+        Assumption Diff interviews people independently across the same set of
+        decisions, surfaces where their assumptions differ, and identifies what
+        needs to be clarified before anyone starts building.
       </p>
 
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-9 flex flex-wrap gap-3">
         <Link
           href="/interview"
           className="rounded-lg bg-foreground px-5 py-3 text-sm font-medium text-background"

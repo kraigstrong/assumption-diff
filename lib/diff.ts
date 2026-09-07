@@ -118,17 +118,16 @@ export function summarize(diffs: DimensionDiff[]): Summary {
   const minor = count("minor");
   const needsDecision = misaligned + minor;
 
+  // Every gap needs settling before work starts -- a one-step gap is a smaller
+  // disagreement, not a skippable one. So the headline counts every dimension
+  // that is not aligned, which is exactly the set that gets a decision block.
   // "1 of 4 dimensions needs..." -- the noun stays plural, only the verb agrees.
-  const verb = (n: number) => (n === 1 ? "needs" : "need");
+  const verb = needsDecision === 1 ? "needs" : "need";
 
-  let headline: string;
-  if (needsDecision === 0) {
-    headline = `Aligned on all ${diffs.length} dimensions.`;
-  } else if (misaligned === 0) {
-    headline = `${minor} of ${diffs.length} dimensions ${verb(minor)} confirming.`;
-  } else {
-    headline = `${misaligned} of ${diffs.length} dimensions ${verb(misaligned)} a decision.`;
-  }
+  const headline =
+    needsDecision === 0
+      ? `Aligned on all ${diffs.length} dimensions.`
+      : `${needsDecision} of ${diffs.length} dimensions ${verb} a decision.`;
 
   return {
     total: diffs.length,

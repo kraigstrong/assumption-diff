@@ -21,11 +21,9 @@ function breakdown(summary: Summary): string {
 
   const parts: string[] = [];
   if (summary.aligned > 0) parts.push(`${summary.aligned} matched`);
-  if (summary.minor > 0) {
-    parts.push(`${summary.minor} came close without matching`);
-  }
+  if (summary.minor > 0) parts.push(`${summary.minor} came close`);
   if (summary.misaligned > 0) {
-    parts.push(`${summary.misaligned} landed far enough apart to need a decision`);
+    parts.push(`${summary.misaligned} landed far apart`);
   }
 
   const list =
@@ -33,7 +31,7 @@ function breakdown(summary: Summary): string {
       ? parts[0]
       : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 
-  return `Of those, ${list}.`;
+  return `Of those, ${list}. Every gap below needs settling before work starts.`;
 }
 
 /**
@@ -134,30 +132,50 @@ function PositionColumn({
   );
 }
 
+/**
+ * The most important block on the page, so it is styled to outweigh everything
+ * around it: a heavy accent rail in the severity colour, a filled ground, and
+ * the decision itself set larger than the comparison above it.
+ *
+ * The two outcomes are labelled by the option, not by whose answer it was.
+ * Nobody wins a decision like this -- the product does or does not get built
+ * on a shared understanding.
+ */
 function DecisionBlock({
   decision,
   loading,
+  diff,
 }: {
   decision: Decision | undefined;
   loading: boolean;
+  diff: DimensionDiff;
 }) {
+  const accent =
+    diff.severity === "misaligned"
+      ? "border-l-misaligned bg-misaligned-bg"
+      : "border-l-minor bg-minor-bg";
+  const label =
+    diff.severity === "misaligned" ? "text-misaligned" : "text-minor";
+
   if (decision) {
     return (
-      <div className="mt-4 rounded-lg border border-foreground/15 bg-background p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+      <div className={`mt-4 rounded-lg border border-l-4 border-line ${accent} p-5`}>
+        <p className={`text-[11px] font-bold uppercase tracking-wider ${label}`}>
           Decision needed
         </p>
-        <p className="mt-2 text-sm font-medium leading-snug">{decision.question}</p>
-        <p className="mt-2 text-xs leading-relaxed text-muted">{decision.stakes}</p>
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded border border-line bg-surface p-3">
-            <dt className="text-[11px] font-semibold text-muted">If Product wins</dt>
-            <dd className="mt-1 text-xs leading-relaxed">{decision.ifBaseline}</dd>
-          </div>
-          <div className="rounded border border-line bg-surface p-3">
-            <dt className="text-[11px] font-semibold text-muted">If Engineering wins</dt>
-            <dd className="mt-1 text-xs leading-relaxed">{decision.ifReviewer}</dd>
-          </div>
+        <p className="mt-2 text-base font-semibold leading-snug">
+          {decision.question}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{decision.stakes}</p>
+        <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+          <Outcome
+            option={diff.baseline.option.label}
+            consequence={decision.ifBaseline}
+          />
+          <Outcome
+            option={diff.reviewer.option.label}
+            consequence={decision.ifReviewer}
+          />
         </dl>
       </div>
     );
@@ -165,17 +183,43 @@ function DecisionBlock({
 
   if (loading) {
     return (
-      <div className="shimmer mt-4 rounded-lg border border-line bg-background p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Writing the decision…
+      <div
+        className={`shimmer mt-4 rounded-lg border border-l-4 border-line ${accent} p-5`}
+      >
+        <p className={`text-[11px] font-bold uppercase tracking-wider ${label}`}>
+          Decision needed
         </p>
-        <div className="mt-3 h-2 w-3/4 rounded bg-line" />
-        <div className="mt-2 h-2 w-1/2 rounded bg-line" />
+        <div className="mt-3 h-2.5 w-3/4 rounded bg-foreground/10" />
+        <div className="mt-2 h-2.5 w-1/2 rounded bg-foreground/10" />
       </div>
     );
   }
 
   return null;
+}
+
+/** One side of the tradeoff, named by the option rather than by the person. */
+function Outcome({
+  option,
+  consequence,
+}: {
+  option: string;
+  consequence: string;
+}) {
+  return (
+    <div className="rounded border border-line bg-surface p-3">
+      {/* No wrapping quotes: several option labels contain quotes of their own. */}
+      <dt>
+        <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">
+          If we choose
+        </span>
+        <span className="mt-1 block text-xs font-semibold leading-snug">
+          {option}
+        </span>
+      </dt>
+      <dd className="mt-2 text-xs leading-relaxed text-muted">{consequence}</dd>
+    </div>
+  );
 }
 
 export function Report({
@@ -289,7 +333,11 @@ export function Report({
               )}
 
               {flagged && (
-                <DecisionBlock decision={decision} loading={decisions === null} />
+                <DecisionBlock
+                  decision={decision}
+                  loading={decisions === null}
+                  diff={diff}
+                />
               )}
 
               {!flagged && (
@@ -301,12 +349,6 @@ export function Report({
           );
         })}
       </ol>
-
-      <footer className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-        Agreement is determined in code by comparing the two answers — the model
-        never decides what counts as a disagreement. It only writes the decision
-        text for the dimensions already flagged.
-      </footer>
     </div>
   );
 }

@@ -125,19 +125,21 @@ describe("summarize", () => {
     expect(s.headline).toBe("Aligned on all 4 dimensions.");
   });
 
-  it("counts misalignment and phrases the headline around decisions", () => {
+  it("counts every gap in the headline, not just the wide ones", () => {
     const s = summaryFor([["a", "d"], ["a", "c"], ["b", "b"], ["c", "d"]]);
     expect(s.misaligned).toBe(2);
     expect(s.minor).toBe(1);
     expect(s.aligned).toBe(1);
+    // 2 misaligned + 1 minor: all three get a decision block, so all three count.
     expect(s.needsDecision).toBe(3);
-    expect(s.headline).toBe("2 of 4 dimensions need a decision.");
+    expect(s.headline).toBe("3 of 4 dimensions need a decision.");
   });
 
-  it("uses softer wording when every gap is only one step", () => {
+  it("still says a decision is needed when every gap is only one step", () => {
     const s = summaryFor([["a", "b"], ["b", "b"], ["c", "c"], ["d", "d"]]);
     expect(s.misaligned).toBe(0);
-    expect(s.headline).toBe("1 of 4 dimensions needs confirming.");
+    expect(s.needsDecision).toBe(1);
+    expect(s.headline).toBe("1 of 4 dimensions needs a decision.");
   });
 });
 
