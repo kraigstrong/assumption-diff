@@ -52,11 +52,15 @@ export const DIMENSIONS: Dimension[] = [
       },
     ],
   alignmentProbes: {
-    // Both said the rows are physically gone. Backups are where that promise
-    // usually turns out to mean two different things.
+    // Backups are where "the rows are gone" usually turns out to mean two
+    // different things.
+    //
+    // Phrased only in terms of the reviewer's own answer. Saying "you both
+    // said" would tell them they matched the baseline before they answer, which
+    // is exactly what showing both probe kinds identically is meant to prevent.
     "hard-delete": {
       question:
-        "You both said the rows are physically removed. What about the nightly backups that still contain them?",
+        "You said the rows are physically removed. What about the nightly backups that still contain them?",
       options: [
         "Purge them from the backups too, whatever that takes",
         "Let the backups age out on their normal retention cycle",
@@ -212,10 +216,12 @@ export const DIMENSIONS: Dimension[] = [
     "strict-minimum": {
       question:
         "Keeping only what the law requires means naming the exact records. Who produces that list?",
+      // Two options, not three. "Reuse the existing retention policy" answered
+      // a different question -- it says the list does not need producing rather
+      // than who produces it. A padded third option is worse than a real pair.
       options: [
         "Legal, before engineering starts building",
         "Engineering drafts it and legal signs off",
-        "Reuse whatever the current retention policy already says",
       ],
     },
   },

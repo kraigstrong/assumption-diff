@@ -63,10 +63,32 @@ describe("fixture integrity", () => {
     }
   });
 
-  it("offers three options on every probe", () => {
+  it("offers at least two real options on every probe", () => {
+    // Not "exactly three". A padded option that does not answer the question is
+    // worse than a genuine pair -- it reads as filler and invites a throwaway
+    // answer, which is the opposite of what a probe is for.
     for (const dimension of DIMENSIONS) {
       for (const [optionId, probe] of Object.entries(dimension.alignmentProbes)) {
-        expect(probe.options.length, `${dimension.id}/${optionId}`).toBe(3);
+        expect(probe.options.length, `${dimension.id}/${optionId}`).toBeGreaterThanOrEqual(2);
+        expect(new Set(probe.options).size, `${dimension.id}/${optionId} repeats an option`)
+          .toBe(probe.options.length);
+      }
+    }
+  });
+
+  it("never tells the reviewer they matched the baseline", () => {
+    // Both probe kinds are rendered identically so the reviewer cannot infer
+    // whether they agreed before answering -- knowing would nudge them toward
+    // consistency and suppress the very gap the probe exists to find. Probe
+    // wording has to honour that too: an earlier draft opened with "You both
+    // said", which gave the whole thing away.
+    const discloses = /\bboth\b|\bagreed?\b|\bmatch(ed|es)?\b|\bthe other\b|\bproduct\b/i;
+    for (const dimension of DIMENSIONS) {
+      for (const [optionId, probe] of Object.entries(dimension.alignmentProbes)) {
+        expect(
+          probe.question,
+          `${dimension.id}/${optionId} reveals the comparison: "${probe.question}"`,
+        ).not.toMatch(discloses);
       }
     }
   });
