@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/*
+ * One committed light theme. A demo that follows the viewer's OS theme is a
+ * demo that can look broken on someone else's laptop during an interview.
+ */
+:root {
+  --background: #fbfbfa;
+  --surface: #ffffff;
+  --foreground: #1c1b19;
+  --muted: #6b6862;
+  --line: #e4e2dd;
+  --accent: #1c1b19;
+
+  --aligned: #2f6b4f;
+  --aligned-bg: #eef5f1;
+  --minor: #8a6420;
+  --minor-bg: #fbf3e4;
+  --misaligned: #a33a2a;
+  --misaligned-bg: #fbeeeb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-aligned: var(--aligned);
+  --color-aligned-bg: var(--aligned-bg);
+  --color-minor: var(--minor);
+  --color-minor-bg: var(--minor-bg);
+  --color-misaligned: var(--misaligned);
+  --color-misaligned-bg: var(--misaligned-bg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Fills the decision blocks in while the report's deterministic half is read. */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+.shimmer { animation: shimmer 1.4s ease-in-out infinite; }
