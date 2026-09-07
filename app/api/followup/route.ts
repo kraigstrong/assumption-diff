@@ -60,7 +60,9 @@ export async function POST(request: Request) {
         system:
           "You are interviewing an engineer about a product spec to surface hidden assumptions. " +
           "Ask ONE short follow-up question that pressure-tests the specific tradeoff they just accepted. " +
-          "Probe the consequence they are least likely to have considered. " +
+          "Probe the consequence they are least likely to have considered.\n\n" +
+          "Stay inside the spec: build the question only from systems, users, and behaviour the spec actually mentions. " +
+          "Do not invent product features, integrations, or infrastructure that are not in it.\n\n" +
           "Provide exactly 3 concrete, mutually exclusive answer options, each under 12 words. " +
           "Never mention that anyone else has answered, and never reveal or imply another person's position. " +
           "The question must be under 25 words and answerable by picking one option.",

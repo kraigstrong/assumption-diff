@@ -1,12 +1,15 @@
 /**
  * A recorded session, used to render /sample without an API call or a session.
  *
- * Only the reviewer's answers and the model's decision text are stored here --
- * the diff itself is recomputed by lib/diff.ts at render time, so the sample
- * cannot show scoring that differs from a real run.
+ * CAPTURED FROM A REAL RUN on 2026-09-07 -- the follow-up questions were
+ * written by claude-haiku-4-5 and the decisions by claude-sonnet-5, through the same
+ * routes the live report uses. Nothing here is hand-written.
  *
- * PROVISIONAL: replace with a genuine captured run once the API key is
- * available. See README "Regenerating the sample".
+ * Only the reviewer's answers and the model's decision text are stored. The
+ * diff itself is recomputed by lib/diff.ts at render time, so the sample
+ * cannot show scoring that a real run would not produce.
+ *
+ * To re-capture, see README "Regenerating the sample report".
  */
 import type { Answer, Decision } from "./types";
 
@@ -18,13 +21,13 @@ export const SAMPLE_ANSWERS: Answer[] = [
       "Hard delete breaks every foreign key we have. Anonymizing gets the same user-facing outcome without a migration.",
     followUp: {
       question:
-        "Anonymized rows keep their foreign keys. If a support agent searches the old email, what should they find?",
+        "If a deleted user's anonymized data still appears in activity logs and reports, does that satisfy your enterprise prospects' security expectations?",
       options: [
-        "Nothing at all",
-        "An anonymized placeholder record",
-        "The original record, flagged deleted",
+        "Yes, anonymization alone meets their requirements.",
+        "No, we need to purge deleted user data entirely.",
+        "Uncertain—we should confirm during security review.",
       ],
-      answer: "An anonymized placeholder record",
+      answer: "Yes, anonymization alone meets their requirements.",
     },
   },
   {
@@ -34,13 +37,13 @@ export const SAMPLE_ANSWERS: Answer[] = [
       "Those comments are on documents the team paid for. Removing them is destroying other people's data.",
     followUp: {
       question:
-        "If the departing user wrote something they now regret, who can take it down?",
+        "If a deleted user's comment stays visible but their profile is gone, can teammates still contact them about the feedback?",
       options: [
-        "Only the workspace admin",
-        "Nobody — it is permanent",
-        "The user, before they delete",
+        "Yes, teammates can reply and they'll receive notifications",
+        "No, replies go nowhere since the account is deleted",
+        "Unclear what happens with notifications to deleted accounts",
       ],
-      answer: "Only the workspace admin",
+      answer: "No, replies go nowhere since the account is deleted",
     },
   },
   {
@@ -50,20 +53,29 @@ export const SAMPLE_ANSWERS: Answer[] = [
       "72 hours is a cron job. Thirty days means building a restore path and keeping the data hot.",
     followUp: {
       question:
-        "During the cooling-off window, can the user still sign in and use the product normally?",
-      options: ["Yes, fully", "Sign-in only, to cancel", "No, the account is locked"],
-      answer: "Sign-in only, to cancel",
+        "If a user re-authenticates and cancels deletion during the cooling-off window, do they lose any data created or modified after they initiated delete?",
+      options: [
+        "Yes, those changes are discarded permanently",
+        "No, all changes are preserved intact",
+        "Changes are preserved but marked separately",
+      ],
+      answer: "No, all changes are preserved intact",
     },
   },
   {
     dimensionId: "legal",
     optionId: "broad-hold",
     rationale:
-      "I would rather keep the audit trail. If we are asked what happened to an account, “we deleted it” is not an answer.",
+      "I'd rather keep the audit trail. If we're asked what happened to an account, “we deleted it” isn't an answer.",
     followUp: {
-      question: "How long should the audit trail outlive the account itself?",
-      options: ["12 months", "Same as invoices — 7 years", "Indefinitely"],
-      answer: "Same as invoices — 7 years",
+      question:
+        "If a user deletes their account but your audit logs prove they committed fraud, who owns the legal risk of that retained data?",
+      options: [
+        "Your company alone, regardless of local privacy law",
+        "The user, since they chose deletion",
+        "Shared between company and user depending on jurisdiction",
+      ],
+      answer: "Shared between company and user depending on jurisdiction",
     },
   },
 ];
@@ -72,45 +84,45 @@ export const SAMPLE_DECISIONS: Decision[] = [
   {
     dimensionId: "scope",
     question:
-      "Does “deleted” mean the row is gone, or only that it can no longer identify anyone?",
+      "Should deletion be a true hard delete of database rows, or anonymization that leaves data structurally intact?",
     stakes:
-      "Engineering picks a schema this week, and reversing an anonymize-in-place design later is a full data migration.",
+      "Enterprise security reviewers may reject anonymization as fake deletion, killing deals or failing the compliance audit.",
     ifBaseline:
-      "Hard delete means rewriting every foreign key and losing the historical counts finance reports on.",
+      "Hard delete requires reworking every foreign key relationship, a bigger migration before launch.",
     ifReviewer:
-      "Anonymized rows keep the user's record on disk, which is not what the deletion email promises them.",
+      "Anonymization ships faster but leaves recoverable data in logs/reports that may not satisfy security reviewers.",
   },
   {
     dimensionId: "shared",
     question:
-      "Does a departing user's comment belong to them, or to the workspace that paid for the document?",
+      "Do a deleted user's comments on shared docs get scrubbed of name only, or left completely untouched?",
     stakes:
-      "Either a team loses context it depends on, or a deletion request is only partly honored. There is no option that avoids both.",
+      "Teammates may try to reply to feedback from someone whose account no longer exists, hitting a dead end either way.",
     ifBaseline:
-      "Threads lose their replies, and the admins who kept paying file the support tickets.",
+      "Stripping the name preserves conversation flow but still requires touching other people's shared documents.",
     ifReviewer:
-      "The user is told their data was deleted while their words stay visible to their old team.",
+      "Leaving it untouched avoids destroying team data but leaves a named identity behind that the user asked to erase.",
   },
   {
     dimensionId: "timing",
     question:
-      "How long is the recovery window, and can the account be used during it?",
+      "Is the recovery window 72 hours (simple cron) or 30 days (requires a restore path and hot storage)?",
     stakes:
-      "A 72-hour cron and a 30-day restore path are different systems — building the wrong one costs the sprint.",
+      "Support ticket volume and engineering build time both hinge on this; wrong choice rebuilds the recovery system later.",
     ifBaseline:
-      "Thirty days of hot, restorable, still-secured data to build and staff.",
+      "30 days keeps angry-deleters' data recoverable but means building and maintaining a restore path and hot storage.",
     ifReviewer:
-      "A user who regrets it on day four has no way back, and support has nothing to offer.",
+      "72 hours is cheap to build but many regretful users will miss the window and lose everything.",
   },
   {
     dimensionId: "legal",
     question:
-      "Which specific records survive a deletion, and for exactly how long?",
+      "Does retention only keep what law strictly requires, or keep a broad audit trail for all deleted accounts?",
     stakes:
-      "Without a named list, engineering guesses, and the compliance audit finds the gap instead of us.",
+      "Without agreement, legal exposure or user trust breaks depending on whether fraud investigations later need data that was purged.",
     ifBaseline:
-      "Dropping security logs means being unable to answer what happened to a disputed account.",
+      "Minimal retention respects user privacy but leaves no audit trail if fraud or disputes surface later.",
     ifReviewer:
-      "Retaining audit history by default keeps data the deletion promise never carved out.",
+      "Broad retention protects against legal risk but contradicts the 'your data is deleted' promise made to users.",
   },
 ];

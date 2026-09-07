@@ -102,8 +102,13 @@ adds value. Concretely:
 | Where | Model | Why that model |
 |---|---|---|
 | `scripts/generate-questions.ts` | `claude-opus-5` | Offline, run once. Latency is free and the output is committed, so buy the best. |
-| `POST /api/followup` | `claude-haiku-4-5` | On the critical path 2–3× mid-interview. Small constrained schema. ~1–2s. |
-| `POST /api/report` | `claude-sonnet-5` | Writes prose about a diff the code already computed. One call for all flagged dimensions. |
+| `POST /api/followup` | `claude-haiku-4-5` | On the critical path 2–3× mid-interview. Small constrained schema. Measured ~4s. |
+| `POST /api/report` | `claude-sonnet-5` | Writes prose about a diff the code already computed. One call covers every flagged dimension. Measured ~11s. |
+
+Those are measured, not estimated. The report call is the slow one, which is why
+`/report` renders its deterministic half immediately and fills the decision
+blocks in afterwards — by the time you have read the first comparison, the
+prose has arrived.
 
 Model IDs are constants in `lib/models.ts` — one line each to change.
 
@@ -195,9 +200,19 @@ and re-check the baseline before adopting anything.
 
 ### Regenerating the sample report
 
-`lib/sampleReport.ts` holds only the engineer's answers and the model's decision
-text. The diff itself is recomputed by `lib/diff.ts` at render time, so the
-sample can never display scoring a real run wouldn't produce.
+`lib/sampleReport.ts` is captured from a real session — the follow-up questions
+in it were written by Haiku and the decisions by Sonnet, through the same routes
+the live report uses. None of it is hand-written, so `/sample` cannot flatter
+the tool by showing output better than it actually produces.
+
+It stores only the engineer's answers and the decision text. The diff is
+recomputed by `lib/diff.ts` at render time, so the sample can never display
+scoring a real run wouldn't produce.
+
+To re-capture: run the interview with answers that diverge from the baseline,
+then read the request/response pair for `POST /api/report` out of devtools and
+paste both into the fixture. The shape is `SAMPLE_ANSWERS` (what the interview
+saved to sessionStorage) and `SAMPLE_DECISIONS` (what the route returned).
 
 ---
 

@@ -47,10 +47,11 @@ async function main() {
     thinking: { type: "adaptive" },
     system:
       "You design interview questions that expose hidden disagreement between a product manager and an engineer reading the same spec.\n\n" +
-      "Produce EXACTLY 4 dimensions. For each, exactly 4 answer options ordered from most aggressive//thorough (first) to most conservative/minimal (last).\n\n" +
+      "Produce EXACTLY 4 dimensions. For each, exactly 4 answer options ordered from most aggressive/most thorough (FIRST) to most conservative/most minimal (LAST).\n\n" +
       "Requirements:\n" +
       "- Each dimension targets an ambiguity the spec leaves open that engineering must resolve before building.\n" +
       "- The 4 options must lie on ONE coherent axis, so that being 2 apart is a bigger disagreement than being 1 apart.\n" +
+      "- `spectrumLow` must describe where the FIRST option sits and `spectrumHigh` where the LAST option sits. Getting these backwards inverts the whole axis, so check them against your own option order before answering.\n" +
       "- Every option must be defensible. No strawmen; a reasonable person should be able to pick any of them.\n" +
       "- Options must be mutually exclusive and concrete about consequences, not vague preferences.\n" +
       "- `whyItMatters`: one sentence on the cost of leaving it unresolved.\n" +
@@ -89,11 +90,19 @@ export const DIMENSIONS: Dimension[] = ${JSON.stringify(
 `;
 
   writeFileSync("lib/questions.generated.ts", source);
+
+  for (const d of result.dimensions) {
+    if (d.options.length !== 4) {
+      console.warn(`  ! "${d.title}" has ${d.options.length} options, expected 4`);
+    }
+  }
   console.log(`\nWrote lib/questions.generated.ts (${result.dimensions.length} dimensions)`);
   for (const d of result.dimensions) {
-    console.log(`\n  ${d.title}  [${d.spectrumLow} -> ${d.spectrumHigh}]`);
+    console.log(`\n  ${d.title}`);
+    console.log(`    axis: ${d.spectrumLow}  ->  ${d.spectrumHigh}`);
     console.log(`    ${d.question}`);
     d.options.forEach((o, i) => console.log(`      ${i}. ${o.label}`));
+    console.log(`    ^ check option 0 matches "${d.spectrumLow}"`);
   }
   console.log("\nNext: diff against lib/questions.ts, then re-check lib/baseline.ts.");
 }

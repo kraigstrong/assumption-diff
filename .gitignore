@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# one-time generator output; review by hand, never imported
+lib/questions.generated.ts
