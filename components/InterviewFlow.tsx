@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BASELINE_ANSWERS } from "@/lib/baseline";
 import { shouldAskFollowUp } from "@/lib/diff";
+import { PRD } from "@/lib/prd";
 import { DIMENSIONS } from "@/lib/questions";
 import { saveAnswers } from "@/lib/session";
 import type { Answer, FollowUp } from "@/lib/types";
@@ -21,6 +22,9 @@ function baselineWeight(dimensionId: string): number {
 
 export function InterviewFlow() {
   const router = useRouter();
+  // The spec has to be read before the questions mean anything, so it is the
+  // first step of the flow rather than something to scroll past on the landing.
+  const [started, setStarted] = useState(false);
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("core");
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -103,6 +107,53 @@ export function InterviewFlow() {
       rationale: rationale.trim(),
       followUp: { ...followUp, answer: choice },
     });
+  }
+
+  if (!started) {
+    return (
+      <div className="mx-auto max-w-2xl py-10">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Before you start
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+          You’re the engineer who has to build this.
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          Read the spec below. Then you’ll answer {DIMENSIONS.length} questions
+          about how you’d actually build it. The product lead who wrote it has
+          already answered the same ones.
+        </p>
+
+        <div className="mt-6 rounded-lg border border-line bg-surface p-5">
+          <p className="text-sm font-medium">{PRD.title}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted">
+            {PRD.body}
+          </p>
+        </div>
+
+        <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted">
+          What you’ll be asked about
+        </p>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {DIMENSIONS.map((d) => (
+            <li key={d.id} className="rounded-lg border border-line bg-surface p-3">
+              <p className="text-xs font-medium">{d.title}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                {d.spectrum.low} → {d.spectrum.high}
+              </p>
+            </li>
+          ))}
+        </ul>
+
+        <button
+          type="button"
+          onClick={() => setStarted(true)}
+          className="mt-8 w-full rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-background"
+        >
+          Start the interview
+        </button>
+      </div>
+    );
   }
 
   return (

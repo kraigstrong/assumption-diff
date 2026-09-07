@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { PRD } from "@/lib/prd";
 import type { DimensionDiff, Severity, Summary } from "@/lib/diff";
 import type { Decision } from "@/lib/types";
 
@@ -6,6 +8,33 @@ const SEVERITY = {
   minor: { label: "Minor gap", className: "bg-minor-bg text-minor" },
   misaligned: { label: "Misaligned", className: "bg-misaligned-bg text-misaligned" },
 } satisfies Record<Severity, { label: string; className: string }>;
+
+
+/**
+ * Explains the badges in words rather than numbers, and stays grammatical at
+ * every ratio -- including all-aligned and all-misaligned.
+ */
+function breakdown(summary: Summary): string {
+  if (summary.needsDecision === 0) {
+    return "They gave the same answer every time, so there is nothing to settle before work starts.";
+  }
+
+  const parts: string[] = [];
+  if (summary.aligned > 0) parts.push(`${summary.aligned} matched`);
+  if (summary.minor > 0) {
+    parts.push(`${summary.minor} came close without matching`);
+  }
+  if (summary.misaligned > 0) {
+    parts.push(`${summary.misaligned} landed far enough apart to need a decision`);
+  }
+
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+
+  return `Of those, ${list}.`;
+}
 
 /**
  * Where each person sits on the dimension's axis. Four dots, two markers --
@@ -91,14 +120,9 @@ function PositionColumn({
         emphasis ? "border-foreground/25 bg-surface" : "border-line bg-surface"
       }`}
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-          {who}
-        </span>
-        <span className="font-mono text-[11px] text-muted">
-          weight {option.weight}
-        </span>
-      </div>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        {who}
+      </span>
       <p className="mt-2 text-sm font-medium leading-snug">{option.label}</p>
       <p className="mt-1 text-xs leading-relaxed text-muted">{option.detail}</p>
       {rationale && (
@@ -113,11 +137,9 @@ function PositionColumn({
 function DecisionBlock({
   decision,
   loading,
-  unavailable,
 }: {
   decision: Decision | undefined;
   loading: boolean;
-  unavailable: boolean;
 }) {
   if (decision) {
     return (
@@ -153,15 +175,6 @@ function DecisionBlock({
     );
   }
 
-  if (unavailable) {
-    return (
-      <p className="mt-4 rounded-lg border border-dashed border-line p-3 text-xs text-muted">
-        AI synthesis unavailable — the comparison above is computed in code and
-        is unaffected.
-      </p>
-    );
-  }
-
   return null;
 }
 
@@ -180,18 +193,45 @@ export function Report({
   return (
     <div>
       <header className="border-b border-line pb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Assumption diff · Account Deletion
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Assumption diff · Account Deletion
+          </p>
+          {/* The browser's back button lands mid-interview, so give an exit. */}
+          <Link
+            href="/"
+            className="text-xs text-muted underline underline-offset-4 hover:text-foreground"
+          >
+            Home
+          </Link>
+        </div>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
           {summary.headline}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-          Product and Engineering answered the same four questions about the same
-          spec. Positions are scored in code by how far apart they sit on each
-          axis — {summary.aligned} aligned, {summary.minor} one step apart,{" "}
-          {summary.misaligned} two or more.
+          Product and Engineering answered the same {summary.total} questions
+          about the same spec. {breakdown(summary)}
         </p>
+
+        {synthesisUnavailable && summary.needsDecision > 0 && (
+          <p className="mt-4 rounded-lg border border-dashed border-line p-3 text-xs leading-relaxed text-muted">
+            The written decisions are unavailable right now — the model call
+            didn’t return. Everything below is computed in code and is
+            unaffected.
+          </p>
+        )}
+
+        <details className="mt-5 rounded-lg border border-line bg-surface">
+          <summary className="cursor-pointer px-4 py-2.5 text-xs font-medium text-muted marker:text-line">
+            Original PRD text
+          </summary>
+          <div className="border-t border-line px-4 py-3">
+            <p className="text-xs font-medium">{PRD.title}</p>
+            <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted">
+              {PRD.body}
+            </p>
+          </div>
+        </details>
       </header>
 
       <ol className="mt-8 space-y-8">
@@ -212,11 +252,6 @@ export function Report({
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${severity.className}`}
                 >
                   {severity.label}
-                </span>
-                <span className="font-mono text-[11px] text-muted">
-                  |{diff.baseline.option.weight} − {diff.reviewer.option.weight}| ={" "}
-                  {diff.distance}
-                  {diff.distance === 1 ? " step" : " steps"} apart
                 </span>
               </div>
 
@@ -254,11 +289,7 @@ export function Report({
               )}
 
               {flagged && (
-                <DecisionBlock
-                  decision={decision}
-                  loading={decisions === null}
-                  unavailable={synthesisUnavailable}
-                />
+                <DecisionBlock decision={decision} loading={decisions === null} />
               )}
 
               {!flagged && (
@@ -272,9 +303,9 @@ export function Report({
       </ol>
 
       <footer className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-        Alignment is computed in code from the weights above — the model never
-        decides what counts as a disagreement. It only writes the decision text
-        for the dimensions already flagged.
+        Agreement is determined in code by comparing the two answers — the model
+        never decides what counts as a disagreement. It only writes the decision
+        text for the dimensions already flagged.
       </footer>
     </div>
   );

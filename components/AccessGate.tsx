@@ -41,12 +41,15 @@ export function AccessGate() {
     <div className="mx-auto max-w-md py-20">
       <h1 className="text-2xl font-semibold tracking-tight">Access code</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        This demo calls a paid API, so it sits behind a shared passphrase. Ask
-        Kraig for it, or view the{" "}
+        This demo calls a paid API, so it sits behind a shared passphrase. The
+        code is included in the written description submitted with this packet.
+      </p>
+      <p className="mt-3 text-sm leading-relaxed text-muted">
+        Don’t have it handy? The{" "}
         <a href="/sample" className="underline underline-offset-4">
           sample report
         </a>{" "}
-        instead — that needs no code.
+        shows the finished output and needs no code.
       </p>
 
       <form onSubmit={submit} className="mt-6">
