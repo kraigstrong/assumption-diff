@@ -259,9 +259,8 @@ export function Report({
 
         {synthesisUnavailable && summary.needsDecision > 0 && (
           <p className="mt-4 rounded-lg border border-dashed border-line p-3 text-xs leading-relaxed text-muted">
-            The written decisions are unavailable right now — the model call
-            didn’t return. Everything below is computed in code and is
-            unaffected.
+            Some written decisions didn’t come back from the model. Everything
+            below is computed in code and is unaffected.
           </p>
         )}
 

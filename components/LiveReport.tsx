@@ -53,11 +53,18 @@ export function LiveReport() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ answers }),
     })
-      .then((response) => response.json())
+      .then((response) => {
+        // An error body (401 expired session, 429 rate limit) parses as JSON
+        // just fine, and would otherwise be read as "zero decisions, nothing
+        // wrong" -- leaving every flagged dimension blank with no explanation.
+        if (!response.ok) throw new Error(`report failed: ${response.status}`);
+        return response.json();
+      })
       .then((body) => {
         if (cancelled) return;
-        setFetched(body.decisions ?? []);
-        if (body.unavailable) setUnavailable(true);
+        const decisions = Array.isArray(body?.decisions) ? body.decisions : [];
+        setFetched(decisions);
+        if (body?.unavailable || decisions.length === 0) setUnavailable(true);
       })
       .catch(() => {
         if (cancelled) return;

@@ -4,6 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getClient, MODELS } from "@/lib/anthropic";
 import { clientIp, hasValidSession, rateLimit } from "@/lib/auth";
 import { BASELINE_ANSWERS } from "@/lib/baseline";
+import { coversEveryDimension } from "@/lib/decisions";
 import { buildDiff, flaggedDiffs } from "@/lib/diff";
 import { DIMENSIONS } from "@/lib/questions";
 import { PRD } from "@/lib/prd";
@@ -18,17 +19,24 @@ import { PRD } from "@/lib/prd";
  * payload cannot invent a disagreement or misreport the other side's position.
  */
 
-const DecisionSchema = z.object({
-  decisions: z.array(
-    z.object({
-      dimensionId: z.string(),
-      question: z.string(),
-      stakes: z.string(),
-      ifBaseline: z.string(),
-      ifReviewer: z.string(),
-    }),
-  ),
-});
+/**
+ * Built per request so `dimensionId` is an enum of exactly the flagged ids.
+ * Structured outputs then make a misspelled or invented id impossible, rather
+ * than something we have to detect after the fact.
+ */
+function decisionSchema(flaggedIds: string[]) {
+  return z.object({
+    decisions: z.array(
+      z.object({
+        dimensionId: z.enum(flaggedIds as [string, ...string[]]),
+        question: z.string(),
+        stakes: z.string(),
+        ifBaseline: z.string(),
+        ifReviewer: z.string(),
+      }),
+    ),
+  });
+}
 
 const RequestSchema = z.object({
   answers: z
@@ -75,6 +83,8 @@ export async function POST(request: Request) {
 
   if (flagged.length === 0) return NextResponse.json({ decisions: [] });
 
+  const flaggedIds = flagged.map((diff) => diff.dimension.id);
+
   const client = getClient();
   // No key: the report still renders its deterministic half.
   if (!client) return NextResponse.json({ decisions: [], unavailable: true });
@@ -118,15 +128,22 @@ export async function POST(request: Request) {
             content: `SPEC:\n${PRD.body}\n\nDISAGREEMENTS:\n\n${blocks.join("\n\n")}`,
           },
         ],
-        output_config: { effort: "low", format: zodOutputFormat(DecisionSchema) },
+        output_config: {
+          effort: "low",
+          format: zodOutputFormat(decisionSchema(flaggedIds)),
+        },
       },
       { timeout: 30_000 },
     );
 
     const decisions = response.parsed_output?.decisions ?? [];
+
+    // A partial or duplicated list would leave flagged dimensions rendering an
+    // empty gap, so anything less than full coverage falls back to the visible
+    // notice. Whatever did come back is still shown alongside it.
     return NextResponse.json({
       decisions,
-      unavailable: decisions.length === 0,
+      unavailable: !coversEveryDimension(flaggedIds, decisions),
     });
   } catch (error) {
     console.error("[report] synthesis unavailable:", error);
