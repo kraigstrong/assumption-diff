@@ -26,13 +26,19 @@ The interview asks about four dimensions where that ambiguity hides:
 | **Legal Retention** | Deletion wins → retention wins |
 
 Each has four answer options placed on that axis with a weight of 0–3.
-Disagreement is `|weightA − weightB|`: 0 is aligned, 1 is a minor gap, 2+ means
-the two people are building different products.
+Disagreement is `|weightA − weightB|`:
 
-Every non-zero gap gets a decision block. A one-step gap is a smaller
-disagreement, not a skippable one — so the report's headline counts exactly the
-set of dimensions that get one. The distance still drives severity, which is
-what colours the block, but it never decides whether something needs settling.
+| Distance | Second-order probe | Verdict | Colour |
+|---|---|---|---|
+| 0 | probe answers match | Aligned | green |
+| 0 | probe answers differ | **Deeper gap** | yellow |
+| 1 | — | Minor gap | yellow |
+| 2–3 | — | Misaligned | red |
+
+Every non-aligned dimension gets a decision block. A one-step gap is a smaller
+disagreement, not a skippable one, and a deeper gap is a real one hiding under
+an apparent agreement — so the headline counts exactly the set of dimensions
+that get a block.
 
 **The product lead's answers are pre-recorded** (`lib/baseline.ts`), so the demo
 is single-player and reproducible: you play the engineer and diff against a
@@ -99,7 +105,8 @@ adds value. Concretely:
 
 - Which dimensions are asked, in what order, with which options and weights.
 - Whether two answers disagree, and by how much (`lib/diff.ts`).
-- Whether a follow-up question is worth asking.
+- Whether a follow-up is worth asking, and which kind to ask.
+- Whether an apparent agreement survives its second-order probe.
 - Every number and badge on the report.
 
 **The model does:**
@@ -117,25 +124,46 @@ prose has arrived.
 
 Model IDs are constants in `lib/models.ts` — one line each to change.
 
-### Follow-ups are gated by the deterministic score
+### Two kinds of follow-up, doing two different jobs
 
-Because the baseline is known at answer time, the client computes the distance
-the moment you pick an option and **only calls the model where you diverge**.
-A run where you agree with the product lead everywhere makes zero follow-up
-calls. This keeps the interview at 6–7 questions and cuts roughly 40% of the
-LLM latency out of the critical path.
+Every dimension gets a follow-up, but which kind depends on whether you agreed
+with the baseline — and the difference matters more than it looks.
 
-The follow-up is itself multiple-choice — the model writes the question *and*
-its three options — so no answer is open-ended and nothing becomes
-incomparable.
+**Where you diverge: an adaptive probe.** The model writes a question tailored
+to the answer you just gave. It's multiple-choice (the model writes the question
+*and* its three options), so nothing is open-ended. It is **evidence** — it
+enriches the decision text on the report, but it never changes a verdict.
+
+**Where you agree: a frozen probe.** A fixed second-order question stored in
+`lib/questions.ts`, which the product lead already answered too. Because both
+people answered *the same* question, their answers are comparable — and a
+comparable answer can **change the verdict**. Agreeing that deletion means "hard
+delete the rows" and then splitting on whether that reaches the backups is a
+real disagreement, and the report now says so.
+
+That asymmetry is not arbitrary:
+
+> Any probe that can change an outcome must be answered by both people, which
+> means it cannot be generated at runtime from one person's reasoning. Adaptive
+> probes are structurally limited to being evidence. That is the entire reason
+> the second-order probes are fixtures.
+
+The frozen probes need no API call, so they are instant. Only the option the
+baseline picked is ever reachable, so there are four of them, not sixteen —
+`lib/fixtures.test.ts` enforces that they exist, that the baseline answered
+them, and that no unreachable ones accumulate.
 
 ### If the model is unavailable, the demo still works
 
-Missing API key, timeout, or an API error: follow-ups are skipped silently and
-the report renders its full deterministic half with an explicit *"AI synthesis
-unavailable"* note in place of the decision prose. The deterministic diff is
-the product; the model is an enhancement. Verify it yourself by unsetting
-`ANTHROPIC_API_KEY` and running the interview.
+Missing API key, timeout, or an API error: adaptive follow-ups are skipped and
+the report renders its full deterministic half with a visible note in place of
+the decision prose.
+
+The frozen probes are unaffected, because they never touch the network. A run
+with `ANTHROPIC_API_KEY` unset still asks them, still scores them, and still
+reports deeper gaps — disagreements that would otherwise read as "Aligned on all
+4 dimensions". The deterministic path finds *more* than it used to, not less.
+Verify it yourself by unsetting the key and running the interview.
 
 ---
 
@@ -185,8 +213,9 @@ components/
   LiveReport.tsx        renders the diff instantly, fills decisions in as they arrive
 lib/
   diff.ts               the scoring core  <- start here
-  questions.ts          the frozen question set
-  baseline.ts           the product lead's recorded answers
+  questions.ts          the frozen question set, plus the second-order probes
+  baseline.ts           the product lead's recorded answers, including probes
+  fixtures.test.ts      guards the id references between those three files
   sampleReport.ts       a recorded session, for /sample
   models.ts, anthropic.ts, auth.ts, session.ts, prd.ts, types.ts
 scripts/

@@ -22,6 +22,27 @@ export type Dimension = {
   question: string;
   /** Exactly 4, ordered by ascending weight. */
   options: Option[];
+  /**
+   * Second-order probes keyed by option id. A probe is only ever reached when
+   * both people pick that option, and the baseline picks exactly one per
+   * dimension -- so in practice only the baseline's option needs one. A missing
+   * entry simply means no probe is asked.
+   */
+  alignmentProbes: Record<string, StaticProbe>;
+};
+
+/**
+ * A frozen second-order probe, asked when both people picked the same option.
+ *
+ * It is static precisely so both people answer the SAME question -- that is what
+ * makes their answers comparable, and comparable is what lets a probe change a
+ * verdict. An adaptive probe generated from one person's reasoning could only
+ * ever be evidence.
+ */
+export type StaticProbe = {
+  question: string;
+  /** Exactly 3, compared by exact string like the adaptive follow-up. */
+  options: string[];
 };
 
 /** An LLM-generated probe, fired only where the reviewer diverges from the baseline. */
@@ -37,7 +58,17 @@ export type Answer = {
   dimensionId: string;
   optionId: string;
   rationale: string;
+  /** Adaptive probe. Reviewer only, evidence only -- never changes a verdict. */
   followUp?: FollowUp;
+  /**
+   * The chosen option of the static probe. Recorded for BOTH people, so it is
+   * comparable and can change a verdict.
+   *
+   * Only the answer is stored: the question and options are looked up from
+   * `dimension.alignmentProbes[optionId]`, so a recorded answer cannot drift
+   * out of sync with the probe text it was given for.
+   */
+  probeAnswer?: string;
 };
 
 /** The LLM-written prose for a flagged dimension. */

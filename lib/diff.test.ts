@@ -23,7 +23,17 @@ function dimension(id: string): Dimension {
       { id: "c", label: "C", detail: "", weight: 2 },
       { id: "d", label: "D", detail: "", weight: 3 },
     ],
+    // Only option "a" carries a probe, mirroring the real fixtures where only
+    // the baseline's option is ever reachable.
+    alignmentProbes: {
+      a: { question: "But how far?", options: ["all", "some", "none"] },
+    },
   };
+}
+
+/** An answer that also answered the static probe. */
+function probed(dimensionId: string, optionId: string, probeAnswer: string): Answer {
+  return { dimensionId, optionId, rationale: "", probeAnswer };
 }
 
 function answer(dimensionId: string, optionId: string): Answer {
@@ -152,5 +162,83 @@ describe("flaggedDiffs", () => {
       [answer("1", "a"), answer("2", "b"), answer("3", "d")],
     );
     expect(flaggedDiffs(diffs).map((d) => d.dimension.id)).toEqual(["2", "3"]);
+  });
+});
+
+describe("second-order probes", () => {
+  const d = dimension("scope");
+
+  it("stays aligned when both give the same probe answer", () => {
+    const result = diffDimension(d, probed("scope", "a", "all"), probed("scope", "a", "all"));
+    expect(result.severity).toBe("aligned");
+    expect(result.probe?.agreed).toBe(true);
+    expect(result.contested).toBeNull();
+  });
+
+  it("upgrades to a deeper gap when the probe answers differ", () => {
+    const result = diffDimension(d, probed("scope", "a", "all"), probed("scope", "a", "none"));
+    expect(result.severity).toBe("deeper");
+    expect(result.distance).toBe(0);
+    expect(result.probe?.agreed).toBe(false);
+  });
+
+  it("contests the probe answers, not the shared option", () => {
+    const result = diffDimension(d, probed("scope", "a", "all"), probed("scope", "a", "none"));
+    expect(result.contested).toEqual({ a: "all", b: "none" });
+  });
+
+  it("contests the two options when the gap is first-order", () => {
+    const result = diffDimension(d, answer("scope", "a"), answer("scope", "c"));
+    expect(result.contested).toEqual({ a: "A", b: "C" });
+  });
+
+  it("ignores the probe once the two already disagree on the surface", () => {
+    // A probe answer recorded against a different option must not leak into a
+    // first-order comparison.
+    const result = diffDimension(
+      d,
+      probed("scope", "a", "all"),
+      probed("scope", "b", "none"),
+    );
+    expect(result.severity).toBe("minor");
+    expect(result.probe).toBeUndefined();
+  });
+
+  it("stays aligned when the dimension has no probe for that option", () => {
+    const result = diffDimension(d, probed("scope", "d", "all"), probed("scope", "d", "none"));
+    expect(result.severity).toBe("aligned");
+    expect(result.probe).toBeUndefined();
+  });
+
+  it("stays aligned when one side never answered the probe", () => {
+    const result = diffDimension(d, probed("scope", "a", "all"), answer("scope", "a"));
+    expect(result.severity).toBe("aligned");
+    expect(result.probe).toBeUndefined();
+  });
+});
+
+describe("deeper gaps in the summary", () => {
+  const dimensions = [dimension("1"), dimension("2")];
+
+  it("counts a deeper gap as needing a decision", () => {
+    const diffs = buildDiff(
+      dimensions,
+      [probed("1", "a", "all"), probed("2", "a", "all")],
+      [probed("1", "a", "none"), probed("2", "a", "all")],
+    );
+    const s = summarize(diffs);
+    expect(s.deeper).toBe(1);
+    expect(s.aligned).toBe(1);
+    expect(s.needsDecision).toBe(1);
+    expect(s.headline).toBe("1 of 2 dimensions needs a decision.");
+  });
+
+  it("sends deeper gaps to the model for a decision", () => {
+    const diffs = buildDiff(
+      dimensions,
+      [probed("1", "a", "all"), probed("2", "a", "all")],
+      [probed("1", "a", "none"), probed("2", "a", "all")],
+    );
+    expect(flaggedDiffs(diffs).map((x) => x.dimension.id)).toEqual(["1"]);
   });
 });
