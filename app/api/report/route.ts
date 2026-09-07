@@ -52,6 +52,9 @@ const RequestSchema = z.object({
             answer: z.string().max(200).nullable(),
           })
           .optional(),
+        // Required for second-order scoring: without it Zod strips the field
+        // and every deeper gap silently scores as aligned.
+        probeAnswer: z.string().max(200).optional(),
       }),
     )
     .length(DIMENSIONS.length),
@@ -89,9 +92,31 @@ export async function POST(request: Request) {
   // No key: the report still renders its deterministic half.
   if (!client) return NextResponse.json({ decisions: [], unavailable: true });
 
-  const blocks = flagged.map((diff) =>
-    [
-      `--- DIMENSION: ${diff.dimension.id} (${diff.dimension.title})`,
+  const blocks = flagged.map((diff) => {
+    const header = `--- DIMENSION: ${diff.dimension.id} (${diff.dimension.title})`;
+
+    // A deeper gap is a different shape of disagreement: they picked the same
+    // option and split on what it implies. Saying so plainly stops the model
+    // writing about a first-order conflict that does not exist.
+    if (diff.severity === "deeper" && diff.probe) {
+      return [
+        header,
+        `They AGREED on the main question, both choosing "${diff.baseline.option.label}".`,
+        `The split is one level down. Asked "${diff.probe.question}":`,
+        `Option A -- "${diff.probe.baselineAnswer}"`,
+        `Option B -- "${diff.probe.reviewerAnswer}"`,
+        "Write the decision about THAT split, not about the option they agreed on.",
+        "`ifBaseline` is the cost of Option A. `ifReviewer` is the cost of Option B.",
+        diff.baseline.rationale
+          ? `Context -- they chose the shared option because: ${diff.baseline.rationale}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    return [
+      header,
       `Gap: ${diff.distance} of 3 steps on the axis "${diff.dimension.spectrum.low} -> ${diff.dimension.spectrum.high}".`,
       `Option A -- "${diff.baseline.option.label}". Argued for because: ${diff.baseline.rationale}`,
       `Option B -- "${diff.reviewer.option.label}"${
@@ -103,8 +128,8 @@ export async function POST(request: Request) {
         : "",
     ]
       .filter(Boolean)
-      .join("\n"),
-  );
+      .join("\n");
+  });
 
   try {
     const response = await client.messages.parse(

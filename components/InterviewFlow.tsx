@@ -9,6 +9,13 @@ import { DIMENSIONS } from "@/lib/questions";
 import { saveAnswers } from "@/lib/session";
 import type { Answer, FollowUp } from "@/lib/types";
 
+/**
+ * Both probe kinds render identically. The reviewer should not be able to tell
+ * whether they matched the baseline before answering -- knowing would nudge
+ * them toward consistency, which is exactly the disagreement we are hunting.
+ */
+type Probe = { question: string; options: string[]; kind: "static" | "adaptive" };
+
 type Phase = "core" | "probing" | "followup";
 
 /** Weight the Product lead chose for a dimension, for the divergence gate. */
@@ -30,7 +37,7 @@ export function InterviewFlow() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [rationale, setRationale] = useState("");
-  const [followUp, setFollowUp] = useState<FollowUp | null>(null);
+  const [probe, setProbe] = useState<Probe | null>(null);
 
   const dimension = DIMENSIONS[index];
   const isLast = index === DIMENSIONS.length - 1;
@@ -53,7 +60,7 @@ export function InterviewFlow() {
     setPhase("core");
     setOptionId(null);
     setRationale("");
-    setFollowUp(null);
+    setProbe(null);
   }
 
   async function submitCore() {
@@ -68,13 +75,24 @@ export function InterviewFlow() {
       rationale: rationale.trim(),
     };
 
-    // Deterministic gate: only probe where the two sides actually diverge.
     const distance = Math.abs(baselineWeight(dimension.id) - chosen.weight);
+
+    // They agreed on the surface. Ask the frozen second-order probe -- the same
+    // question the baseline answered, which is what makes the two comparable
+    // and lets the answer change the verdict. No API call, so it is instant.
     if (!shouldAskFollowUp(distance)) {
+      const staticProbe = dimension.alignmentProbes[optionId];
+      if (staticProbe) {
+        setProbe({ ...staticProbe, kind: "static" });
+        setPhase("followup");
+        return;
+      }
       commit(answer);
       return;
     }
 
+    // They diverged. The disagreement is already established, so this probe is
+    // adaptive and serves as evidence for the report rather than as a verdict.
     setPhase("probing");
     try {
       const response = await fetch("/api/followup", {
@@ -89,7 +107,11 @@ export function InterviewFlow() {
       const body = await response.json().catch(() => null);
 
       if (body?.followUp) {
-        setFollowUp(body.followUp);
+        setProbe({
+          question: body.followUp.question,
+          options: body.followUp.options,
+          kind: "adaptive",
+        });
         setPhase("followup");
         return;
       }
@@ -99,14 +121,28 @@ export function InterviewFlow() {
     commit(answer);
   }
 
-  function answerFollowUp(choice: string) {
-    if (!optionId || !followUp) return;
-    commit({
+  function answerProbe(choice: string) {
+    if (!optionId || !probe) return;
+
+    const answer: Answer = {
       dimensionId: dimension.id,
       optionId,
       rationale: rationale.trim(),
-      followUp: { ...followUp, answer: choice },
-    });
+    };
+
+    if (probe.kind === "static") {
+      // Comparable against the baseline's recorded answer, so it is scored.
+      commit({ ...answer, probeAnswer: choice });
+      return;
+    }
+
+    // Adaptive: kept for the report to read, never scored.
+    const followUp: FollowUp = {
+      question: probe.question,
+      options: probe.options,
+      answer: choice,
+    };
+    commit({ ...answer, followUp });
   }
 
   if (!started) {
@@ -234,21 +270,21 @@ export function InterviewFlow() {
         </div>
       )}
 
-      {phase === "followup" && followUp && (
+      {phase === "followup" && probe && (
         <div className="mt-8">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
             Follow-up
           </p>
           <h1 className="mt-2 text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-            {followUp.question}
+            {probe.question}
           </h1>
 
           <div className="mt-6 space-y-2">
-            {followUp.options.map((option) => (
+            {probe.options.map((option) => (
               <button
                 key={option}
                 type="button"
-                onClick={() => answerFollowUp(option)}
+                onClick={() => answerProbe(option)}
                 className="w-full rounded-lg border border-line bg-surface p-4 text-left text-sm leading-snug transition hover:border-foreground/30"
               >
                 {option}

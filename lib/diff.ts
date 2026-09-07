@@ -12,11 +12,19 @@
  */
 import type { Answer, Dimension, Option } from "./types";
 
-export type Severity = "aligned" | "minor" | "misaligned";
+export type Severity = "aligned" | "deeper" | "minor" | "misaligned";
 
 export type Position = {
   option: Option;
   rationale: string;
+};
+
+/** The second-order exchange, when both sides answered the same static probe. */
+export type ProbeComparison = {
+  question: string;
+  baselineAnswer: string;
+  reviewerAnswer: string;
+  agreed: boolean;
 };
 
 export type DimensionDiff = {
@@ -28,14 +36,25 @@ export type DimensionDiff = {
   severity: Severity;
   /** The reviewer's follow-up exchange, when one was asked. */
   followUp?: Answer["followUp"];
+  /** Present only when both people answered the dimension's static probe. */
+  probe?: ProbeComparison;
+  /**
+   * What the decision is actually between. For a first-order gap that is the
+   * two chosen options; for a second-order gap it is the two probe answers.
+   * Null when there is nothing to decide.
+   */
+  contested: { a: string; b: string } | null;
 };
 
 /**
- * Distance to severity.
+ * First-order distance to severity.
  *
  * Adjacent options are genuinely defensible variants of each other, so a
  * distance of 1 is a gap worth confirming rather than a real fight. Two or
  * more steps apart means the two people are building different products.
+ *
+ * A distance of 0 is only provisionally aligned -- the static probe can still
+ * upgrade it to "deeper". See `diffDimension`.
  */
 export function severityFor(distance: number): Severity {
   if (distance === 0) return "aligned";
@@ -76,13 +95,51 @@ export function diffDimension(
   const reviewerOption = findOption(dimension, reviewerAnswer.optionId);
   const distance = Math.abs(baselineOption.weight - reviewerOption.weight);
 
+  let severity = severityFor(distance);
+  let contested: DimensionDiff["contested"] =
+    distance === 0
+      ? null
+      : { a: baselineOption.label, b: reviewerOption.label };
+
+  // Second order. Two people can pick the same option and still mean different
+  // things by it; the static probe is what catches that. It only applies where
+  // they agreed on the surface -- past that point the disagreement is already
+  // visible and the probe would have nothing to add.
+  let probe: ProbeComparison | undefined;
+  const staticProbe = dimension.alignmentProbes[baselineOption.id];
+
+  if (
+    distance === 0 &&
+    staticProbe &&
+    baselineAnswer.probeAnswer &&
+    reviewerAnswer.probeAnswer
+  ) {
+    const agreed = baselineAnswer.probeAnswer === reviewerAnswer.probeAnswer;
+    probe = {
+      question: staticProbe.question,
+      baselineAnswer: baselineAnswer.probeAnswer,
+      reviewerAnswer: reviewerAnswer.probeAnswer,
+      agreed,
+    };
+
+    if (!agreed) {
+      severity = "deeper";
+      contested = {
+        a: baselineAnswer.probeAnswer,
+        b: reviewerAnswer.probeAnswer,
+      };
+    }
+  }
+
   return {
     dimension,
     baseline: { option: baselineOption, rationale: baselineAnswer.rationale },
     reviewer: { option: reviewerOption, rationale: reviewerAnswer.rationale },
     distance,
-    severity: severityFor(distance),
+    severity,
     followUp: reviewerAnswer.followUp,
+    probe,
+    contested,
   };
 }
 
@@ -104,6 +161,8 @@ export function buildDiff(
 export type Summary = {
   total: number;
   aligned: number;
+  /** Same option, different answer to the second-order probe. */
+  deeper: number;
   minor: number;
   misaligned: number;
   /** Dimensions needing an explicit decision before work starts. */
@@ -116,7 +175,8 @@ export function summarize(diffs: DimensionDiff[]): Summary {
   const count = (s: Severity) => diffs.filter((d) => d.severity === s).length;
   const misaligned = count("misaligned");
   const minor = count("minor");
-  const needsDecision = misaligned + minor;
+  const deeper = count("deeper");
+  const needsDecision = misaligned + minor + deeper;
 
   // Every gap needs settling before work starts -- a one-step gap is a smaller
   // disagreement, not a skippable one. So the headline counts every dimension
@@ -132,6 +192,7 @@ export function summarize(diffs: DimensionDiff[]): Summary {
   return {
     total: diffs.length,
     aligned: count("aligned"),
+    deeper,
     minor,
     misaligned,
     needsDecision,

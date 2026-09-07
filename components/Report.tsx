@@ -5,6 +5,9 @@ import type { Decision } from "@/lib/types";
 
 const SEVERITY = {
   aligned: { label: "Aligned", className: "bg-aligned-bg text-aligned" },
+  // Same option, different answer once pushed. Yellow like a minor gap, because
+  // they do agree on the headline -- but it still needs settling.
+  deeper: { label: "Deeper gap", className: "bg-minor-bg text-minor" },
   minor: { label: "Minor gap", className: "bg-minor-bg text-minor" },
   misaligned: { label: "Misaligned", className: "bg-misaligned-bg text-misaligned" },
 } satisfies Record<Severity, { label: string; className: string }>;
@@ -21,6 +24,9 @@ function breakdown(summary: Summary): string {
 
   const parts: string[] = [];
   if (summary.aligned > 0) parts.push(`${summary.aligned} matched`);
+  if (summary.deeper > 0) {
+    parts.push(`${summary.deeper} matched until we pushed further`);
+  }
   if (summary.minor > 0) parts.push(`${summary.minor} came close`);
   if (summary.misaligned > 0) {
     parts.push(`${summary.misaligned} landed far apart`);
@@ -103,13 +109,16 @@ function Marker({
 
 function PositionColumn({
   who,
-  option,
+  title,
+  detail,
   rationale,
   emphasis,
 }: {
   who: string;
-  option: DimensionDiff["baseline"]["option"];
-  rationale: string;
+  title: string;
+  /** Absent for a probe answer, which has no explanatory line of its own. */
+  detail?: string;
+  rationale?: string;
   emphasis: boolean;
 }) {
   return (
@@ -121,8 +130,10 @@ function PositionColumn({
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
         {who}
       </span>
-      <p className="mt-2 text-sm font-medium leading-snug">{option.label}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted">{option.detail}</p>
+      <p className="mt-2 text-sm font-medium leading-snug">{title}</p>
+      {detail && (
+        <p className="mt-1 text-xs leading-relaxed text-muted">{detail}</p>
+      )}
       {rationale && (
         <p className="mt-3 border-l-2 border-line pl-3 text-xs italic leading-relaxed text-muted">
           “{rationale}”
@@ -145,10 +156,13 @@ function DecisionBlock({
   decision,
   loading,
   diff,
+  explained,
 }: {
   decision: Decision | undefined;
   loading: boolean;
   diff: DimensionDiff;
+  /** True when the page already carries the "didn't come back" banner. */
+  explained: boolean;
 }) {
   const accent =
     diff.severity === "misaligned"
@@ -156,6 +170,7 @@ function DecisionBlock({
       : "border-l-minor bg-minor-bg";
   const label =
     diff.severity === "misaligned" ? "text-misaligned" : "text-minor";
+  const contested = diff.contested;
 
   if (decision) {
     return (
@@ -168,12 +183,14 @@ function DecisionBlock({
         </p>
         <p className="mt-2 text-sm leading-relaxed text-muted">{decision.stakes}</p>
         <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+          {/* For a deeper gap the contested pair is the two probe answers, not
+              the option they both agreed on. */}
           <Outcome
-            option={diff.baseline.option.label}
+            option={contested?.a ?? diff.baseline.option.label}
             consequence={decision.ifBaseline}
           />
           <Outcome
-            option={diff.reviewer.option.label}
+            option={contested?.b ?? diff.reviewer.option.label}
             consequence={decision.ifReviewer}
           />
         </dl>
@@ -192,6 +209,19 @@ function DecisionBlock({
         <div className="mt-3 h-2.5 w-3/4 rounded bg-foreground/10" />
         <div className="mt-2 h-2.5 w-1/2 rounded bg-foreground/10" />
       </div>
+    );
+  }
+
+  // Loading is done, this dimension is flagged, and no decision arrived for it.
+  // The banner covers the cases the server knows about; this covers the ones it
+  // does not -- notably the client and server disagreeing about what counts as
+  // flagged. Either way a flagged dimension must never render an empty gap.
+  if (!explained) {
+    return (
+      <p className="mt-4 rounded-lg border border-dashed border-line p-3 text-xs leading-relaxed text-muted">
+        No written decision came back for this one. The comparison above is
+        computed in code and is unaffected.
+      </p>
     );
   }
 
@@ -306,20 +336,76 @@ export function Report({
                 <Spectrum diff={diff} />
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <PositionColumn
-                  who="Product"
-                  option={diff.baseline.option}
-                  rationale={diff.baseline.rationale}
-                  emphasis={false}
-                />
-                <PositionColumn
-                  who="Engineering (you)"
-                  option={diff.reviewer.option}
-                  rationale={diff.reviewer.rationale}
-                  emphasis={flagged}
-                />
-              </div>
+              {diff.severity === "deeper" && diff.probe ? (
+                // They picked the same option. The columns should show where
+                // they actually split, so the agreement is stated once here and
+                // the probe answers take the prominent slot below.
+                <>
+                  <div className="mt-4 rounded-lg border border-line bg-surface p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                      Both chose
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium leading-snug">
+                      {diff.baseline.option.label}
+                    </p>
+                    {(diff.baseline.rationale || diff.reviewer.rationale) && (
+                      <dl className="mt-3 space-y-1.5">
+                        {diff.baseline.rationale && (
+                          <div className="text-xs leading-relaxed text-muted">
+                            <dt className="inline font-semibold">Product: </dt>
+                            <dd className="inline italic">
+                              “{diff.baseline.rationale}”
+                            </dd>
+                          </div>
+                        )}
+                        {diff.reviewer.rationale && (
+                          <div className="text-xs leading-relaxed text-muted">
+                            <dt className="inline font-semibold">You: </dt>
+                            <dd className="inline italic">
+                              “{diff.reviewer.rationale}”
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+                  </div>
+
+                  <p className="mt-4 text-sm leading-relaxed">
+                    <span className="font-semibold">Then we asked: </span>
+                    <span className="text-muted">{diff.probe.question}</span>
+                  </p>
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <PositionColumn
+                      who="Product"
+                      title={diff.probe.baselineAnswer}
+                      emphasis={false}
+                    />
+                    <PositionColumn
+                      who="Engineering (you)"
+                      title={diff.probe.reviewerAnswer}
+                      emphasis
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <PositionColumn
+                    who="Product"
+                    title={diff.baseline.option.label}
+                    detail={diff.baseline.option.detail}
+                    rationale={diff.baseline.rationale}
+                    emphasis={false}
+                  />
+                  <PositionColumn
+                    who="Engineering (you)"
+                    title={diff.reviewer.option.label}
+                    detail={diff.reviewer.option.detail}
+                    rationale={diff.reviewer.rationale}
+                    emphasis={flagged}
+                  />
+                </div>
+              )}
 
               {diff.followUp?.answer && (
                 <p className="mt-3 text-xs leading-relaxed text-muted">
@@ -336,12 +422,15 @@ export function Report({
                   decision={decision}
                   loading={decisions === null}
                   diff={diff}
+                  explained={synthesisUnavailable}
                 />
               )}
 
               {!flagged && (
                 <p className="mt-3 text-xs leading-relaxed text-muted">
-                  Same position. Nothing to resolve here.
+                  {diff.probe?.agreed
+                    ? `Same position — and the same answer when asked “${diff.probe.question}” Nothing to resolve here.`
+                    : "Same position. Nothing to resolve here."}
                 </p>
               )}
             </li>

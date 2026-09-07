@@ -1,6 +1,10 @@
 /**
  * Person A: the Product lead who wrote the PRD.
  *
+ * `probeAnswer` is their answer to the second-order probe for the option they
+ * picked -- recorded so that a reviewer who agrees with them on the surface can
+ * still be compared at depth. See `alignmentProbes` in lib/questions.ts.
+ *
  * Recorded once and committed, so every reviewer diffs against the same
  * positions and the demo is reproducible. Rationales are written in the voice
  * of someone thinking about users and trust, not about schemas -- which is
@@ -17,23 +21,31 @@ export const BASELINE_ANSWERS: Answer[] = [
     optionId: "hard-delete",
     rationale:
       "If we tell someone we deleted their data, it needs to be gone. Anything short of that becomes a trust story the first time it leaks.",
+    probeAnswer:
+      "Purge them from the backups too, whatever that takes",
   },
   {
     dimensionId: "shared",
     optionId: "tombstone",
     rationale:
       "Their teammates shouldn't lose the thread of a conversation because one person left. But the name has to come off it.",
+    probeAnswer:
+      "Scrub those across the workspace too",
   },
   {
     dimensionId: "timing",
     optionId: "recovery-window",
     rationale:
       "People delete accounts when they're angry and regret it two days later. A recovery window saves them their data and saves us the tickets.",
+    probeAnswer:
+      "Gone immediately, as if the deletion were already final",
   },
   {
     dimensionId: "legal",
     optionId: "strict-minimum",
     rationale:
       "Keep the invoices because we're required to. Everything else goes -- I don't want us inventing reasons to hold onto things.",
+    probeAnswer:
+      "Legal, before engineering starts building",
   },
 ];

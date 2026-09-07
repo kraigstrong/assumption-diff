@@ -24,6 +24,11 @@ Clarity beats abstraction here by explicit instruction. Duplication is acceptabl
 ## Where to look first
 
 - `lib/diff.ts` — the deterministic scoring core. All misalignment decisions
-  happen here, never in the LLM. Bugs here invalidate the whole report.
+  happen here, never in the LLM. Bugs here invalidate the whole report. Note the
+  second-order path: two people can pick the same option and still be scored as
+  a "deeper gap" if they answer the frozen probe differently.
+- `lib/questions.ts` + `lib/baseline.ts` — three fixtures referring to each other
+  by string id. A mismatch is silent, not loud; `lib/fixtures.test.ts` is what
+  catches it.
 - `lib/auth.ts`, `app/api/*/route.ts` — access gate and the two LLM routes.
 - `app/interview/page.tsx` — the state machine driving the interview.

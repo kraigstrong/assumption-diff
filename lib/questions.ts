@@ -51,6 +51,19 @@ export const DIMENSIONS: Dimension[] = [
         weight: 3,
       },
     ],
+  alignmentProbes: {
+    // Both said the rows are physically gone. Backups are where that promise
+    // usually turns out to mean two different things.
+    "hard-delete": {
+      question:
+        "You both said the rows are physically removed. What about the nightly backups that still contain them?",
+      options: [
+        "Purge them from the backups too, whatever that takes",
+        "Let the backups age out on their normal retention cycle",
+        "Backups sit outside what we promise when we say deleted",
+      ],
+    },
+  },
   },
   {
     id: "shared",
@@ -90,6 +103,18 @@ export const DIMENSIONS: Dimension[] = [
         weight: 3,
       },
     ],
+  alignmentProbes: {
+    // Both said the name comes off. The name is rarely only in the author field.
+    tombstone: {
+      question:
+        "The author label comes off. What about the parts of the text that still name them — @mentions, a signed-off comment?",
+      options: [
+        "Scrub those across the workspace too",
+        "Only the author label changes; the text stays as written",
+        "Flag them for a workspace admin to decide",
+      ],
+    },
+  },
   },
   {
     id: "timing",
@@ -129,6 +154,19 @@ export const DIMENSIONS: Dimension[] = [
         weight: 3,
       },
     ],
+  alignmentProbes: {
+    // Both said 30 days. What the team sees during those 30 days is a different
+    // question, and one the spec never touches.
+    "recovery-window": {
+      question:
+        "During those 30 days, what do their teammates see?",
+      options: [
+        "Gone immediately, as if the deletion were already final",
+        "Still listed, marked as leaving",
+        "Unchanged until the window closes",
+      ],
+    },
+  },
   },
   {
     id: "legal",
@@ -168,6 +206,19 @@ export const DIMENSIONS: Dimension[] = [
         weight: 3,
       },
     ],
+  alignmentProbes: {
+    // Both said "only what law requires". Nobody has said which records those
+    // are, and engineering cannot build against that sentence.
+    "strict-minimum": {
+      question:
+        "Keeping only what the law requires means naming the exact records. Who produces that list?",
+      options: [
+        "Legal, before engineering starts building",
+        "Engineering drafts it and legal signs off",
+        "Reuse whatever the current retention policy already says",
+      ],
+    },
+  },
   },
 ];
 

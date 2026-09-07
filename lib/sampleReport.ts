@@ -1,15 +1,19 @@
 /**
  * A recorded session, used to render /sample without an API call or a session.
  *
- * CAPTURED FROM A REAL RUN on 2026-09-07 -- the follow-up questions were
- * written by claude-haiku-4-5 and the decisions by claude-sonnet-5, through
- * the same routes the live report uses. Nothing here is hand-written.
+ * CAPTURED FROM A REAL RUN on 2026-09-07 -- the adaptive follow-ups were
+ * written by claude-haiku-4-5 and the decisions by claude-sonnet-5, through the
+ * same routes the live report uses. Nothing here is hand-written.
  *
- * Chosen to exercise all three outcomes so /sample shows the full range:
- *   scope   -- two steps apart  -> Misaligned
- *   shared  -- two steps apart  -> Misaligned
- *   timing  -- same answer      -> Aligned, and no follow-up was asked
- *   legal   -- one step apart   -> Minor gap
+ * Chosen to exercise all four outcomes so /sample shows the full range:
+ *   scope   -- two steps apart                      -> Misaligned
+ *   shared  -- SAME option, split on the probe       -> Deeper gap
+ *   timing  -- same option and same probe answer     -> Aligned
+ *   legal   -- one step apart                        -> Minor gap
+ *
+ * `probeAnswer` on shared and timing is the static second-order probe, which is
+ * what the scoring compares. `followUp` on scope and legal is the adaptive
+ * probe, which is evidence for the report and never changes a verdict.
  *
  * Only the reviewer's answers and the decision text are stored. The diff is
  * recomputed by lib/diff.ts at render time, so the sample cannot show scoring
@@ -27,51 +31,41 @@ export const SAMPLE_ANSWERS: Answer[] = [
       "Hard delete breaks every foreign key we have. Anonymizing gets the same user-facing outcome without a migration.",
     followUp: {
       question:
-        "If a user deletes their account, then resubscribes with the same email, will they see their old anonymized activity history?",
+        "If a deleted account remains as an anonymous placeholder, can customers prove to auditors that personal data is genuinely gone?",
       options: [
-        "Yes, linked by email, historical context visible",
-        "No, completely separate new account created",
-        "Unclear until we test the re-signup flow",
+        "Yes, we document anonymization meets compliance standards",
+        "No, we'll need to explain retained data structure",
+        "Unclear, depends on which regulations apply to us",
       ],
-      answer: "No, completely separate new account created",
+      answer: "No, we'll need to explain retained data structure",
     },
   },
   {
     dimensionId: "shared",
-    optionId: "workspace-owns",
-    rationale:
-      "Those comments are on documents the team paid for. Removing them is destroying other people's data.",
-    followUp: {
-      question:
-        "If a deleted user's comments remain visible, how do you prevent those comments from becoming a compliance liability when the user's personal data should have been removed?",
-      options: [
-        "Anonymize the comment author but keep text intact",
-        "Delete comments only, preserve document edit history",
-        "Accept that some personal data will persist",
-      ],
-      answer: "Accept that some personal data will persist",
-    },
+    optionId: "tombstone",
+    rationale: "Threads have to stay readable. Taking the name off is enough.",
+    probeAnswer: "Only the author label changes; the text stays as written",
   },
   {
     dimensionId: "timing",
     optionId: "recovery-window",
     rationale:
-      "Agreed — 30 days is worth the restore path. People delete angry and come back.",
+      "Thirty days is worth the restore path. People delete angry and come back.",
+    probeAnswer: "Gone immediately, as if the deletion were already final",
   },
   {
     dimensionId: "legal",
     optionId: "broad-hold",
-    rationale:
-      "I'd rather keep the audit trail. If we're asked what happened to an account, “we deleted it” isn't an answer.",
+    rationale: "I'd rather keep the audit trail than explain its absence.",
     followUp: {
       question:
-        "If regulators request user data after deletion, does your legal team pre-approve which retained records you will actually disclose?",
+        "If a deleted user sues you and discovers their full audit trail survived deletion, how do you explain deletion was genuine to the court?",
       options: [
-        "Yes, we have written guidance on disclosure scope",
-        "No, we decide case-by-case when asked",
-        "We retain data but assume we cannot share it",
+        "We document the compliance hold in the deletion confirmation email",
+        "We accept the legal risk to preserve audit integrity",
+        "We delete audit logs but keep transaction records only",
       ],
-      answer: "No, we decide case-by-case when asked",
+      answer: "We accept the legal risk to preserve audit integrity",
     },
   },
 ];
@@ -79,34 +73,35 @@ export const SAMPLE_ANSWERS: Answer[] = [
 export const SAMPLE_DECISIONS: Decision[] = [
   {
     dimensionId: "scope",
-    question: "Do we hard-delete user rows or anonymize them in place?",
+    question:
+      "Should account deletion physically remove user rows (hard delete) or anonymize them in place?",
     stakes:
-      "Foreign key integrity vs. genuine data erasure — pick wrong and either the app breaks or a leak becomes a lawsuit.",
+      "Choosing wrong means either a costly schema migration later or a failed audit when auditors find retained personal data structures.",
     ifBaseline:
-      "Hard delete requires rebuilding every dependent table's foreign key handling before launch.",
+      "Hard delete requires reworking every foreign key referencing users, risking broken records and app errors.",
     ifReviewer:
-      "Anonymizing leaves real personal data in the database, undermining any claim that deletion actually happened.",
+      "Anonymizing leaves data structures behind that we must explain to auditors, weakening our 'data is gone' claim.",
   },
   {
     dimensionId: "shared",
     question:
-      "Do we scrub deleted users' names from shared comments, or leave shared content completely untouched?",
+      "When a user is deleted, do we scrub their name from @mentions and signed comments workspace-wide, or only replace the author label?",
     stakes:
-      "Determines whether a deleted user's personal data can keep surfacing in teammates' workspaces after they've left.",
+      "Unresolved, engineering can't build the deletion job since it doesn't know how deep the redaction needs to go.",
     ifBaseline:
-      'Attributing edits to "[deleted user]" still keeps their comment text stored and visible indefinitely.',
+      "Scrubbing text everywhere requires scanning and rewriting historical content, risking broken context or missed references.",
     ifReviewer:
-      "Leaving content untouched means the user's name and words persist in the product after deletion, unresolved for compliance.",
+      "Leaving names in old text means the person isn't truly erased from conversations, undercutting the deletion promise.",
   },
   {
     dimensionId: "legal",
     question:
-      "Do we retain only legally mandated records, or keep a broad compliance hold on deleted accounts?",
+      "Should we retain only legally mandated records after deletion, or keep a broader compliance hold on all activity?",
     stakes:
-      "Decides whether audits get answers or the company holds data it can't justify keeping.",
+      "Without agreement, legal exposure or audit failure risk stays undefined and support can't answer customer questions about what's kept.",
     ifBaseline:
-      "Minimal retention means we may have no record at all if asked what happened to an account.",
+      "Keeping only what's legally required means less protection if disputes arise needing historical activity records.",
     ifReviewer:
-      "A broad hold means we're storing more personal data than required, contradicting the deletion promise made to users.",
+      "A broad compliance hold keeps data we claimed to delete, creating legal risk if a user proves it survived.",
   },
 ];
