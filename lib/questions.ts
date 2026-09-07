@@ -61,10 +61,12 @@ export const DIMENSIONS: Dimension[] = [
     "hard-delete": {
       question:
         "You said the rows are physically removed. What about the nightly backups that still contain them?",
+      // Two options. "Backups sit outside what we promise" restates the scope
+      // of the promise instead of deciding what to do, and lands in the same
+      // place as letting them age out: the data stays.
       options: [
         "Purge them from the backups too, whatever that takes",
         "Let the backups age out on their normal retention cycle",
-        "Backups sit outside what we promise when we say deleted",
       ],
     },
   },
